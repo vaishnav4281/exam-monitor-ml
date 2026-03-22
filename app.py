@@ -1,26 +1,29 @@
+import os
 import sqlite3
 from flask import Flask, render_template, request, jsonify # type: ignore
 
 app = Flask(__name__)
-DB_NAME = 'database.db'
+
+# Enforce absolute pathing natively to prevent server working-directory crashes
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, 'database.db')
+MODEL_PATH = os.path.join(BASE_DIR, 'proctor_ml_model.pkl')
 
 def get_db_connection():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
-
-import os
 
 def calculate_suspicion(tab_switches, idle_seconds, face_warnings=0, right_clicks=0):
     """
     Machine Learning Engine: Predicts Suspect Class via Random Forest (.pkl)
     Falls back to heuristic logic safely if model hasn't been generated yet.
     """
-    if os.path.exists('proctor_ml_model.pkl'):
+    if os.path.exists(MODEL_PATH):
         try:
             import joblib # type: ignore
             import pandas as pd # type: ignore
-            model = joblib.load('proctor_ml_model.pkl')
+            model = joblib.load(MODEL_PATH)
             # Predict Risk Class (0=Safe, 1=Yellow, 2=Orange, 3=Red)
             features = pd.DataFrame([{
                 'tab_switches': tab_switches,
