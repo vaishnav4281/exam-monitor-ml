@@ -32,75 +32,92 @@ ai-exam-proctor/
 
 ---
 
-## 🏗️ 1. Architecture Flow Diagram
-*Visualizes systemic physical component mapping across the internal local loop network.*
+# 1. 🏛️ High-Level System Architecture
+"The 10,000-foot view of how the system works."
+
+We utilize a **Flask-based API architecture** closely integrated with a **Machine Learning inference engine**. The system is layered to securely separate the real-time client UI tracking, backend logic, and centralized SQLite data storage.
+
+🎨 **Architecture Diagram**
 
 ```mermaid
 graph TD
-    subgraph "Frontend Interfaces (Browsers)"
-        E[exam.html - Student Test GUI]
-        A[admin.html - Teacher Dashboard]
+    subgraph "Client Applications"
+        Client["Exam Portal (Student)"]
+        Admin["Dashboard (Teacher)"]
     end
 
-    subgraph "Backend Server (Flask Framework)"
-        API[app.py - API Endpoints]
-        MLP[Proctor ML Engine / joblib]
+    subgraph "Server Backend"
+        API["Flask Server (app.py)"]
+        ML["Random Forest Model (.pkl)"]
     end
 
-    subgraph "Local Storage / Models"
-        DB[(database.db - SQLite SQLite3)]
-        PKL[proctor_ml_model.pkl]
-        CSV[behavior_logs.csv]
+    subgraph "Storage Layer"
+        DB[("SQLite Database")]
     end
 
-    E -- "Webcam Status & Exam Answers" --> API
-    A -- "Live Polling Interval" --> API
-    API -- "Inferences Telemetry Data" --> MLP
-    MLP -- "Predicts Behavior Class" --> API
-    MLP -. "Loads weights" .-> PKL
-    API -- "Reads & Rewrites Logs" --> DB
+    Client -->|"Sends Live Metrics"| API
+    Admin -->|"Polls Dashboard Status"| API
+    API -->|"Extracts Features"| ML
+    ML -->|"Returns Overarching Risk Class"| API
+    API -->|"Saves Profile Stats"| DB
+    DB -->|"Loads Logs"| API
 ```
+
+🗣️ **Presentation Talking Points:**
+* "The user interacts with a clean web interface tracking face bounds natively using Haar Cascades inside the browser."
+* "The heart of the system is the Random Forest ML module, which acts as the 'Proctoring Brain' analyzing behavior dynamically."
+* "The database securely stores lightweight telemetry logs—tab switches, idle time, and ML categorizations—keeping the system extremely fast and preserving privacy!"
 
 ---
 
-## 🔄 2. Linear Data Flow Sequence Diagram
-*Visualizes exactly how data passes between the student and admin linearly.*
+# 2. 🔄 Data Flow Diagrams (DFD)
+"How data moves through the system."
+
+### Level 0: The Context (The Big Picture)
+*Simple Input/Output flow.*
 
 ```mermaid
-sequenceDiagram
-    participant Student as Student (exam.html)
-    participant Server as Flask API Server (app.py)
-    participant Model as ML Predictor (Scikit)
-    participant DB as SQLite SQLite3
-    participant Admin as Teacher (admin.html)
+graph LR
+    S("Student") -- "Metric Telemetry" --> Sys["AI Proctor System"]
+    Sys -- "Real-time Categorization Alerts" --> T("Teacher")
+```
 
-    Student->>Server: Connects & requests Test
-    Server->>DB: Fetch / Questions
-    DB-->>Server: Return Questions Dict
-    Server-->>Student: Render Test UI natively
-    
-    loop Every Time Penalty Limits Reached
-        Student->>Server: POST /api/log (Tabs, Idle, Face Warns)
-        Server->>Model: Formats JSON into Scikit DataFrame
-        Model-->>Server: Analyzes & Returns Risk Category (0/1/2/3)
-        Server->>DB: Update student_logs row logic metrics
-    end
+### Level 1: Detailed Process Flow
+*What happens inside the "Logic Engine"?*
 
-    loop Every 3 Seconds (Admin Watchdog)
-        Admin->>Server: GET /api/status fetch
-        Server->>DB: Grabs overarching student_logs
-        DB-->>Server: Rows returned with ML Score overrides
-        Server-->>Admin: DOM updates into color-coded Leaderboard rows
-    end
+```mermaid
+graph TD
+    A["Raw Feature Metrics"] --> B{"Scikit-Learn Predictor"}
+    B -->|"Class 0"| C["🟢 Green: Safe"]
+    B -->|"Class 1"| D["🟡 Yellow: Warning"]
+    B -->|"Class 2"| E["🟠 Orange: High Risk"]
+    B -->|"Class 3"| F["🔴 Red: Critical Cheating"]
+    C --> G["Commit to SQLite DB"]
+    D --> G
+    E --> G
+    F --> G
 ```
 
 ---
 
-## 🗄️ 3. Entity-Relationship (ER) Diagram
-*Visualizes how the Database architectures natively isolate text and structural information.*
+# 3. 🗂️ Database Design (ER Diagram)
+"How we structure the data."
+
+We use a flat, efficient schema optimized for fast lookups and high-concurrency API polling scaling.
 
 ```mermaid
 erDiagram
+    STUDENT_LOGS {
+        INTEGER id PK
+        TEXT name
+        INTEGER tab_switches
+        INTEGER keystroke_count
+        INTEGER idle_seconds
+        INTEGER face_warnings
+        INTEGER right_clicks
+        INTEGER suspicion_score "ML Categorization %"
+        INTEGER marks
+    }
     QUESTIONS {
         INTEGER id PK
         TEXT question_text
@@ -110,50 +127,84 @@ erDiagram
         TEXT option_d
         TEXT answer
     }
-    
-    STUDENT_LOGS {
-        INTEGER id PK
-        TEXT name
-        INTEGER tab_switches
-        INTEGER keystroke_count
-        INTEGER idle_seconds
-        INTEGER face_warnings
-        INTEGER right_clicks
-        INTEGER suspicion_score "ML Classification Threshold %"
-        INTEGER marks "Final Exam Grade"
-    }
 ```
+
+🗣️ **Presentation Talking Point:** 
+"Notice the `suspicion_score` integer field. This is what allows us to natively interface the Python Machine Learning predictions directly with the HTML front-end to dynamically generate the live color-coded Leaderboard."
 
 ---
 
-## ⚙️ 4. UML Class & Backend Pipeline Integration Diagram
-*Maps exactly how the custom scripts implicitly interlock functions.*
+# 4. 📐 UML Diagrams
+"The formal blueprints of the software."
+
+### A. Sequence Diagram
+"The timeline of a verification request."
+
+```mermaid
+sequenceDiagram
+    participant Cam as Student Exam GUI
+    participant API as Flask Server Node
+    participant AI as Random Forest Brain
+    
+    Cam->>API: POST /log (Tabs, Idle, Warns)
+    API->>AI: Sends compiled tracking arrays
+    AI-->>API: Returns Risk Class prediction
+    API->>API: Maps output class to local bounds
+    API->>API: Commits to SQLite rows securely
+```
+
+### B. Use Case Diagram
+"Who does what?"
+
+```mermaid
+graph LR
+    actor1("Test Taker")
+    actor2("Administrator")
+    sys(("AI-Lite Platform"))
+    
+    actor1 -->|"Attempts Quiz"| sys
+    actor1 -->|"Triggers Penalties"| sys
+    actor2 -->|"Uploads New Exams"| sys
+    actor2 -->|"Monitors Telemetry Flags"| sys
+```
+
+### C. Class Diagram
+"The code structure."
 
 ```mermaid
 classDiagram
-    class TrainModelPy {
-        +generate_training_data(rows: int) dataframe
-        +RandomForestClassifier(parameters)
-        +fit(X, y)
-        +joblib.dump(pkl)
-    }
-
-    class FlaskApplicationAppPy {
-        +Flask(__name__) app
+    class FlaskAPI_AppPy {
+        +Flask() init
+        +calculate_suspicion(metrics) int
         +get_db_connection()
-        +calculate_suspicion(metrics): float
-        +api_log(POST) wrapper
-        +api_submit(POST) grader
     }
-
-    class LocalHaarTrackingJS {
-        +ObjectTracker('face')
-        +requestAnimationFrame()
-        +clearRect() canvas
-        +strokeRect() bound
-        +Date.now() ms validation
+    class MachineLearning_TrainPy {
+        +generate_training_data()
+        +RandomForestClassifier(fit)
+        +joblib.dump() pkl
     }
+    class Application_DOM {
+        +tracking.ObjectTracker('face')
+        +Date.now() bridging debounce
+        +sendLogs() HTTP Async
+    }
+    
+    Application_DOM --> FlaskAPI_AppPy : POST Validation Bounds
+    MachineLearning_TrainPy ..> FlaskAPI_AppPy : Compiles .pkl Model Link
+```
 
-    TrainModelPy ..> FlaskApplicationAppPy : Generates strictly required .pkl ML Pipeline Parameter Dependency!
-    LocalHaarTrackingJS ..> FlaskApplicationAppPy : Automatically drives DOM logic arrays natively triggering API pushes over HTTP
+### D. Activity Diagram
+"The logic flow for classifying threats."
+
+```mermaid
+stateDiagram-v2
+    [*] --> MonitorCamera
+    MonitorCamera --> ReadHooks
+    ReadHooks --> TabSwitch_Event : Window blurred
+    ReadHooks --> FaceMissing_Event : Dropped > 5 secs
+    FaceMissing_Event --> ML_Inference
+    TabSwitch_Event --> ML_Inference
+    ML_Inference --> ClassifyRiskParameters
+    ClassifyRiskParameters --> PushToDashboard
+    PushToDashboard --> [*]
 ```
