@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Lite Exam Interface</title>
+    <!-- Ultra-lightweight Haar Cascade face tracking (replaces heavy ML downloads) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tracking.js/1.1.3/tracking-min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tracking.js/1.1.3/data/face-min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f7f9fc;
+            color: #333;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+        }
+
+        #video-container {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            border: 3px solid #e74c3c;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        video {
+            background: black;
+            display: block;
+        }
+
+        .proctoring-label {
+            background: #e74c3c;
+            color: white;
+            text-align: center;
+            font-size: 12px;
+            padding: 4px;
+            font-weight: bold;
+            position: relative;
+            z-index: 3;
+        }
+
+        .question-card {
+            background: #fff;
+            margin-bottom: 25px;
+            padding: 20px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+        }
+
+        .question-text {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #2c3e50;
+        }
+
+        .option {
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .option:hover {
+            background: #f0f4f8;
+        }
+
+        .option input {
+            margin-right: 10px;
+        }
+
+        #login {
+            text-align: center;
+            padding: 40px 0;
+        }
+
+        #login input {
+            padding: 12px;
+            width: 60%;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+
+        button {
+            padding: 12px 25px;
+            font-size: 16px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #2980b9;
+        }
+
+        #examArea {
+            display: none;
+        }
+
+        .submit-btn {
+            display: block;
+            width: 100%;
+            margin-top: 20px;
+            background: #2ecc71;
+        }
+
+        .submit-btn:hover {
+            background: #27ae60;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="warningBanner"
+        style="display: none; background: #e74c3c; color: white; padding: 15px; font-weight: bold; font-size: 18px; text-align: center; position: fixed; top: 0; left: 0; width: 100%; z-index: 9999; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
+        ⚠️ PROCTOR ALERT: Face Not Detected!
+    </div>
+
+    <div id="video-container"
+        style="display: none; position: fixed; top: 15px; right: 15px; border: 3px solid #e74c3c; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 220px;">
+        <div class="proctoring-label">🔴 LIVE PROCTORING</div>
+        <div style="position: relative; width: 220px; height: 160px;">
+            <video id="webcam" autoplay playsinline width="220" height="160"
+                style="position: absolute; top: 0; left: 0; z-index: 1;"></video>
+            <canvas id="overlay" width="220" height="160"
+                style="position: absolute; top: 0; left: 0; z-index: 2; pointer-events: none;"></canvas>
+        </div>
+    </div>
+
+    <div class="container">
+        <div id="login">
+            <h1>AI-Lite Exam Portal</h1>
+            <p>Please enter your full name to begin the proctored examination.</p>
+            <input type="text" id="studentName" placeholder="Your Full Name">
+            <br>
+            <button onclick="startExam()">Start Proctored Exam</button>
+        </div>
+
+        <div id="examArea">
+            <h1>Examination</h1>
+            <p style="text-align: center; color: #7f8c8d;">Note: Do not switch tabs or remain idle. This session is
+                strictly monitored.</p>
+            <div id="questionsContainer"></div>
+            <button class="submit-btn" onclick="submitExam()">Submit Exam</button>
+        </div>
+    </div>
+
+    <script>
+        let studentName = '';
+        let tabSwitches = 0;
+        let keystrokeCount = 0;
+        let faceWarnings = 0;
+        let rightClicks = 0;
+        let idleSeconds = 0;
+        let lastActivity = Date.now();
+        let logInterval;
+        let idleInterval;
+        let faceInterval;
+
+        async function startExam() {
+            const nameInput = document.getElementById('studentName').value.trim();
+            if (!nameInput) return alert('Please enter your name.');
+            studentName = nameInput;
+
+            document.getElementById('login').style.display = 'none';
+            document.getElementById('examArea').style.display = 'block';
+            document.getElementById('video-container').style.display = 'block';
+
+            // Start webcam preview
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                document.getElementById('webcam').srcObject = stream;
+            } catch (err) {
+                alert('Webcam access is strictly required for this examination.');
+                return location.reload();
+            }
+
+            loadQuestions();
+            startTracking();
+        }
+
+        async function loadQuestions() {
+            const res = await fetch('/api/questions');
+            const questions = await res.json();
+            const container = document.getElementById('questionsContainer');
+
+            container.innerHTML = ''; // IMPORTANT: Clear out the "Loading models" text!
+
+            if (questions.length === 0) {
+                container.innerHTML = '<p>No questions available at the moment.</p>';
+            }
+            questions.forEach((q, index) => {
+                const qDiv = document.createElement('div');
+                qDiv.className = 'question-card';
+                qDiv.innerHTML = `
+                    <div class="question-text">Q${index + 1}: ${q.text}</div>
+                    <label class="option"><input type="radio" name="q${q.id}" value="A"> A) ${q.option_a}</label>
+                    <label class="option"><input type="radio" name="q${q.id}" value="B"> B) ${q.option_b}</label>
+                    <label class="option"><input type="radio" name="q${q.id}" value="C"> C) ${q.option_c}</label>
+                    <label class="option"><input type="radio" name="q${q.id}" value="D"> D) ${q.option_d}</label>
+                `;
+                container.appendChild(qDiv);
+            });
+        }
+
+        function startTracking() {
+            // 1. Detect Tab Switches / Window Minimize
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'hidden') {
+                    tabSwitches++;
+                    alert('WARNING: Tab switching is recorded and may result in disqualification!');
+                }
+            });
+
+            window.addEventListener('blur', () => {
+                // Secondary check for focus loss (clicking outside the window)
+                if (document.visibilityState !== 'hidden') {
+                    tabSwitches++;
+                }
+            });
+
+            // 2. Keystroke Logging
+            document.addEventListener('keydown', () => {
+                keystrokeCount++;
+                resetIdle();
+            });
+
+            // 3. Activity Tracking (Mouse move/click resets idle timer)
+            document.addEventListener('mousemove', resetIdle);
+            document.addEventListener('click', resetIdle);
+
+            // 4. Right-Click & Copy Prevention
+            document.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                rightClicks++;
+                alert('WARNING: Right-click is disabled and recorded as a violation!');
+                sendLogs();
+            });
+            document.addEventListener('copy', (e) => {
+                e.preventDefault();
+                rightClicks++;
+                alert('WARNING: Copying test material is disabled and recorded!');
+                sendLogs();
+            });
+
+            // 5. Head / Face Tracking (Tracking.js runs on AnimationFrame ~30-60FPS)
+            const warningBanner = document.getElementById('warningBanner');
+            let missingTimestamp = 0; // Replaced frame-count with exact literal milliseconds
+            let hasFiredFiveSecondPenalty = false;
+            let multipleFaceCooldown = false;
+
+            const tracker = new tracking.ObjectTracker('face');
+            tracker.setInitialScale(4);
+            tracker.setStepSize(1); // High resolution tracking mapped closer
+            tracker.setEdgesDensity(0.1);
+
+            // Hook it natively to the playing video feed
+            const trackingTask = tracking.track('#webcam', tracker);
+            window.activeTrackingTask = trackingTask; // save to stop it later
+
+            const canvas = document.getElementById('overlay');
+            const context = canvas.getContext('2d');
+
+            let lastRect = null; // Stored to create ghost-smoothing renderer
+
+            tracker.on('track', function (event) {
+                // Clear the canvas every frame to cleanly redraw boundaries
+                context.clearRect(0, 0, canvas.width, canvas.height);
+
+                if (event.data.length === 0) {
+                    if (missingTimestamp === 0) missingTimestamp = Date.now();
+                    const missingTimeMs = Date.now() - missingTimestamp;
+
+                    // 1. UI Smoothing: Keep drawing ghost visual for up to 3000ms (~3 seconds) bridging any tracking drops
+                    if (missingTimeMs < 3000 && lastRect) {
+                        context.strokeStyle = '#2ecc71';
+                        context.lineWidth = 3;
+                        context.strokeRect(lastRect.x, lastRect.y, lastRect.width, lastRect.height);
+
+                        context.fillStyle = '#ff0000';
+                        context.beginPath();
+                        context.arc(lastRect.x + (lastRect.width / 2), lastRect.y + (lastRect.height / 3), 4, 0, 2 * Math.PI);
+                        context.fill();
+                    }
+
+                    // 2. Penalty logic: ONLY warn/penalize strictly at exactly 5 seconds
+                    if (missingTimeMs >= 5000) {
+                        warningBanner.innerText = '⚠️ PROCTOR ALERT: No face detected in webcam!';
+                        warningBanner.style.display = 'block';
+                        
+                        // Fire a single hard penalty ping right when crossing 5 seconds
+                        if (!hasFiredFiveSecondPenalty) {
+                            faceWarnings++;
+                            sendLogs();
+                            hasFiredFiveSecondPenalty = true;
+                        }
+                    }
+                } else {
+                    missingTimestamp = 0; // Instantly reset the 5-sec penalty timer if camera catches them!
+                    hasFiredFiveSecondPenalty = false;
+                    
+                    // Cache the best locked face bounding array
+                    lastRect = event.data[0];
+
+                    // Draw bounding boxes natively onto the canvas!
+                    event.data.forEach(function (rect) {
+                        // Draw green tracking box framing the head bound
+                        context.strokeStyle = '#2ecc71';
+                        context.lineWidth = 3;
+                        context.strokeRect(rect.x, rect.y, rect.width, rect.height);
+
+                        // Draw a red "tracking dot" near the horizontal center mapping eye level
+                        context.fillStyle = '#ff0000';
+                        context.beginPath();
+                        context.arc(rect.x + (rect.width / 2), rect.y + (rect.height / 3), 4, 0, 2 * Math.PI);
+                        context.fill();
+                    });
+
+                    if (event.data.length > 1) {
+                        warningBanner.innerText = '⚠️ PROCTOR ALERT: Multiple faces detected!';
+                        warningBanner.style.display = 'block';
+
+                        // Cooldown so we don't spam penalties for multiple faces
+                        if (!multipleFaceCooldown) {
+                            faceWarnings++;
+                            sendLogs();
+                            multipleFaceCooldown = true;
+                            setTimeout(() => multipleFaceCooldown = false, 3000); // 3 sec cooldown
+                        }
+                    } else {
+                        // Everything is perfect, 1 tracked face locked.
+                        warningBanner.style.display = 'none';
+                    }
+                }
+            });
+
+            // Increment idle time every second
+            idleInterval = setInterval(() => {
+                idleSeconds = Math.floor((Date.now() - lastActivity) / 1000);
+            }, 1000);
+
+            // Send batch logs to back-end every 5 seconds
+            logInterval = setInterval(() => {
+                sendLogs();
+            }, 5000);
+        }
+
+        function resetIdle() {
+            lastActivity = Date.now();
+            idleSeconds = 0;
+        }
+
+        function sendLogs() {
+            const payload = {
+                name: studentName,
+                tab_switches_new: tabSwitches,
+                keystroke_count_new: keystrokeCount,
+                face_warnings_new: faceWarnings,
+                right_clicks_new: rightClicks,
+                idle_seconds: idleSeconds
+            };
+
+            fetch('/api/log', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).catch(e => console.error("Logging error", e));
+
+            // Reset temp counters after firing
+            tabSwitches = 0;
+            keystrokeCount = 0;
+            faceWarnings = 0;
+            rightClicks = 0;
+        }
+
+        async function submitExam() {
+            // Collect answers
+            const answers = {};
+            document.querySelectorAll('.question-card').forEach((card) => {
+                const inputs = card.querySelectorAll('input[type="radio"]');
+                let qId = null;
+                let selected = null;
+                inputs.forEach(input => {
+                    qId = input.name.replace('q', '');
+                    if (input.checked) selected = input.value;
+                });
+                if (qId && selected) {
+                    answers[qId] = selected;
+                }
+            });
+
+            // Submit grading to backend
+            await fetch('/api/submit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: studentName, answers: answers })
+            });
+
+            sendLogs(); // Final log sync
+            clearInterval(logInterval);
+            clearInterval(idleInterval);
+            if (window.activeTrackingTask) window.activeTrackingTask.stop();
+
+            // Stop webcam
+            const video = document.getElementById('webcam');
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+            }
+
+            document.getElementById('examArea').innerHTML = '<h1>Exam Submitted!</h1><p>Your responses and proctoring logs have been saved.</p>';
+            document.getElementById('video-container').style.display = 'none';
+        }
+    </script>
+</body>
+
+</html>
