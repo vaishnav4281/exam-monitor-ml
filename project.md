@@ -178,11 +178,13 @@ classDiagram
         +calculate_suspicion(metrics) int
         +get_db_connection()
     }
+
     class MachineLearning_TrainPy {
         +generate_training_data()
         +RandomForestClassifier(fit)
         +joblib.dump() pkl
     }
+
     class Application_DOM {
         +tracking.ObjectTracker('face')
         +Date.now() bridging debounce
@@ -191,7 +193,6 @@ classDiagram
     
     Application_DOM --> FlaskAPI_AppPy : POST Validation Bounds
     MachineLearning_TrainPy ..> FlaskAPI_AppPy : Compiles .pkl Model Link
-<<<<<<< HEAD
 ```
 
 ### D. Activity Diagram
