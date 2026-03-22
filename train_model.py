@@ -8,22 +8,28 @@ import random
 def generate_training_data(rows=2000):
     data = []
     for _ in range(rows):
-        tabs = random.randint(0, 12)
-        idle = random.randint(0, 150)
-        face = random.randint(0, 20)
-        clicks = random.randint(0, 5)
+        # Exponential distribution mimics real-world behavior (low numbers are extremely common, high are rare)
+        tabs = min(20, int(random.expovariate(1.0 / 2.0)))
+        idle = min(300, int(random.expovariate(1.0 / 40.0)))
+        face = min(30, int(random.expovariate(1.0 / 3.0)))
+        clicks = min(10, int(random.expovariate(1.0 / 1.0)))
         
-        # Ground-truth Pseudo Labeling Logic indicating teacher interventions
-        if tabs == 0 and idle <= 5 and face <= 1 and clicks == 0:
+        # Oracle Logic provides ground-truth clustering!
+        if tabs == 0 and idle <= 30 and face <= 1 and clicks == 0:
             risk = 0 # Class 0 (Green): Ideal student
-        elif tabs <= 1 and idle <= 15 and face <= 3 and clicks == 0:
+        elif tabs <= 1 and idle <= 90 and face <= 3 and clicks == 0:
             risk = 1 # Class 1 (Yellow): Slightly suspicious / accidental
-        elif tabs <= 3 and idle <= 45 and face <= 6 and clicks <= 1:
+        elif tabs <= 3 and idle <= 180 and face <= 6 and clicks <= 1:
             risk = 2 # Class 2 (Orange): High risk / intentional looking away
         else:
             risk = 3 # Class 3 (Red): Critical / obvious cheating behavior
             
         data.append([tabs, idle, face, clicks, risk])
+        
+    # Inject pure "perfect" 0 cases slightly to anchor the floor
+    for _ in range(50):
+        data.append([0, 0, 0, 0, 0])
+        
     return pd.DataFrame(data, columns=['tab_switches', 'idle_seconds', 'face_warnings', 'right_clicks', 'risk_level'])
 
 if __name__ == '__main__':
@@ -36,7 +42,7 @@ if __name__ == '__main__':
     y = df['risk_level']
 
     print("Training Decision Trees...")
-    clf = RandomForestClassifier(n_estimators=100, max_depth=5, random_state=42)
+    clf = RandomForestClassifier(n_estimators=100, random_state=42)
     clf.fit(X, y)
 
     # 3. Export the `.pkl`

@@ -159,6 +159,13 @@
         async function loadMonitor() {
             try {
                 const res = await fetch('/api/status');
+                
+                // Explicitly stop PythonAnywhere HTML 404/500 pages from crashing browser arrays
+                if (!res.ok) {
+                    console.error("PythonAnywhere Server Deployment Error. Check the PythonAnywhere Error Logs inside your dashboard.");
+                    return;
+                }
+                
                 const logs = await res.json();
                 const tbody = document.querySelector('#monitorTable tbody');
                 tbody.innerHTML = '';

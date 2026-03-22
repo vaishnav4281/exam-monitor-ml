@@ -9,6 +9,14 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, 'database.db')
 MODEL_PATH = os.path.join(BASE_DIR, 'proctor_ml_model.pkl')
 
+# Automatically ensure DB schema is populated to prevent crash loops explicitly on Cloud Deployments
+if not os.path.exists(DB_PATH) or os.path.getsize(DB_PATH) == 0:
+    try:
+        from init_db import init_db  # type: ignore
+        init_db()
+    except Exception as e:
+        print("Warning: Backend Auto-Init DB completely skipped/failed:", e)
+
 def get_db_connection():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -134,7 +142,7 @@ def submit_exam():
 
     conn = get_db_connection()
     
-    score: int = 0
+    score = 0
     questions = conn.execute('SELECT id, answer FROM questions').fetchall()
     correct_answers = {str(q['id']): q['answer'] for q in questions}
     
@@ -154,10 +162,14 @@ def submit_exam():
 
 @app.route('/api/status', methods=['GET'])
 def get_status():
-    conn = get_db_connection()
-    logs = conn.execute('SELECT * FROM student_logs ORDER BY suspicion_score DESC, last_active DESC').fetchall()
-    conn.close()
-    return jsonify([dict(l) for l in logs])
+    try:
+        conn = get_db_connection()
+        logs = conn.execute('SELECT * FROM student_logs ORDER BY suspicion_score DESC, last_active DESC').fetchall()
+        conn.close()
+        return jsonify([dict(l) for l in logs])
+    except Exception as e:
+        # Preemptively throw error arrays as dicts securing JSON validation checks
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

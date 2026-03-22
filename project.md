@@ -191,6 +191,25 @@ classDiagram
     
     Application_DOM --> FlaskAPI_AppPy : POST Validation Bounds
     MachineLearning_TrainPy ..> FlaskAPI_AppPy : Compiles .pkl Model Link
+<<<<<<< HEAD
+```
+
+### D. Activity Diagram
+"The logic flow for classifying threats."
+
+```mermaid
+stateDiagram-v2
+    [*] --> MonitorCamera
+    MonitorCamera --> ReadHooks
+    ReadHooks --> TabSwitch_Event : Window blurred
+    ReadHooks --> FaceMissing_Event : Dropped > 5 secs
+    FaceMissing_Event --> ML_Inference
+    TabSwitch_Event --> ML_Inference
+    ML_Inference --> ClassifyRiskParameters
+    ClassifyRiskParameters --> PushToDashboard
+    PushToDashboard --> [*]
+=======
+>>>>>>> 00121b9 (Fix Random Forest class imbalance in training data, remove depth limits, and update architecture docs)
 ```
 
 ### D. Activity Diagram

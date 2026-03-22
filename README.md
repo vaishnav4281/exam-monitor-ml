@@ -81,3 +81,22 @@ Open this link on your own computer to watch the live results:
 
 ## 5. Stopping the Server
 When the exam is totally completely finished, go back to your Terminal and press `Ctrl + C` on your keyboard to shut down the server safely.
+
+---
+
+## 6. Directory Structure & File Descriptions
+Here is a breakdown of every file in this project and what it does:
+
+```text
+ai-exam-monitor/
+├── app.py                 # The core Flask web server. Handles all API requests, saves database logs, and displays the web pages.
+├── init_db.py             # A setup script to initialize the SQLite database and create the 'questions' and 'student_logs' tables.
+├── train_model.py         # A script to generate training data and train the Scikit-Learn Machine Learning model.
+├── proctor_ml_model.pkl   # The saved, trained Random Forest ML model used to calculate out the 'suspicion_score'.
+├── database.db            # The local SQLite database storing all exam questions and student telemetry records.
+├── project.md             # Comprehensive architecture documentation including Data Flow, ER, and UML diagrams.
+├── README.md              # Project documentation, setup guide, and file descriptions.
+└── templates/
+    ├── exam.html          # The student-facing portal. Contains JavaScript for webcam tracking, tab-switch listening, and UI.
+    └── admin.html         # The teacher-facing dashboard for real-time live monitoring and managing questions.
+```
